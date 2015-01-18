@@ -1,4 +1,5 @@
 
+import shlex
 import sys
 import traceback
 
@@ -66,6 +67,17 @@ class Shell:
         self.commands = dict()
         self.add_command('exit', ExitCommand())
         self.add_command('help', HelpCommand(self.commands))
+
+    def parser(self, line):
+        try:
+            return (shlex.split(line, comments=True), '')
+        except ValueError as error:
+            if error.args == ('No closing quotation',):
+                return None, line
+            elif error.args == ('No escaped character',):
+                return None, line[:-1]
+            else:
+                raise
 
     def add_command(self, name, class_):
         self.commands[name] = class_

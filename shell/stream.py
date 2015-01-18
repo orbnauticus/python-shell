@@ -12,6 +12,7 @@ class InputStream:
     def __init__(self, shell, stdin):
         self.stdin = stdin
         self.stdout = shell.stdout
+        self.parser = shell.parser
         self.get_prompt = shell.get_prompt
         self.use_rawinput = shell.use_rawinput
         self.completekey = shell.completekey
@@ -41,36 +42,22 @@ class InputStream:
                 readline.write_history_file(self.history)
 
     def readline(self, continued):
+        prompt = self.get_prompt(continued) if self.isatty else ''
         if self.use_rawinput:
-            return input(self.get_prompt(continued) if self.isatty else '')
+            return '%s\n%s' % (continued, input(prompt))
         else:
             if self.isatty:
-                self.stdout.write(self.get_prompt(continued))
+                self.stdout.write(prompt)
                 self.stdout.flush()
             line = self.stdin.readline()
             if not len(line):
                 raise EOFError
-            return line.rstrip('\r\n')
+            return '%s\n%s' % (continued, line.rstrip('\r\n'))
 
     def __iter__(self):
         with self:
-            multiline = ''
+            excess = ''
             while True:
-                line = self.readline(multiline)
-                if multiline:
-                    line = '%s\n%s' % (multiline, line)
-                multiline = ''
-                try:
-                    words = shlex.split(line, comments=True)
-                except ValueError as error:
-                    if error.args == ('No closing quotation',):
-                        multiline = line
-                        continue
-                    elif error.args == ('No escaped character',):
-                        multiline = line[:-1]
-                        continue
-                    else:
-                        raise
-                if not words:
-                    continue
-                yield words[0], words[1:]
+                statement, excess = self.parser(self.readline(excess))
+                if statement:
+                    yield statement[0], statement[1:]
