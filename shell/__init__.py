@@ -53,9 +53,10 @@ class StubCommand(Command):
 
 
 class Shell:
-    def __init__(self, prompt='$ ', prompt2='> ',
+    def __init__(self, prompt='$ ', prompt2='> ', history=None,
                  use_rawinput=True, completekey='tab', stdout=sys.stdout):
         self.stdout = stdout
+        self.history = history
         self.use_rawinput = use_rawinput
         self.completekey = completekey
         self.environment = Environment(

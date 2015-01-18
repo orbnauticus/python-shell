@@ -1,5 +1,11 @@
 
+import os
 import shlex
+
+try:
+    import readline
+except ImportError:
+    readline = None
 
 
 class InputStream:
@@ -10,29 +16,29 @@ class InputStream:
         self.use_rawinput = shell.use_rawinput
         self.completekey = shell.completekey
         self.isatty = stdin.isatty()
+        self.history = shell.history and os.path.expanduser(shell.history)
 
     def complete(self, text, state):
         pass
 
     def __enter__(self):
-        if self.use_rawinput and self.completekey:
-            try:
-                import readline
-                self.old_completer = readline.get_completer()
-                readline.set_completer(self.complete)
-                readline.parse_and_bind(self.completekey + ": complete")
-            except ImportError:
-                pass
+        if readline and self.use_rawinput and self.completekey:
+            self.old_completer = readline.get_completer()
+            readline.set_completer(self.complete)
+            readline.parse_and_bind(self.completekey + ": complete")
+            if self.history:
+                try:
+                    readline.read_history_file(self.history)
+                except FileNotFoundError:
+                    pass
 
     def __exit__(self, exc, obj, tb):
         if exc is EOFError:
             return True
-        if self.use_rawinput and self.completekey:
-            try:
-                import readline
-                readline.set_completer(self.old_completer)
-            except ImportError:
-                pass
+        if readline and self.use_rawinput and self.completekey:
+            readline.set_completer(self.old_completer)
+            if self.history:
+                readline.write_history_file(self.history)
 
     def readline(self, continued):
         if self.use_rawinput:
