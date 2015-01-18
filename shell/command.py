@@ -13,7 +13,7 @@ class Command:
         if function is not None:
             self.run = function
         parser = getattr(self, 'parser', None)
-        if not parser.description:
+        if parser and not parser.description:
             parser.description = self.run.__doc__
 
     def __call__(self, command, arguments):
