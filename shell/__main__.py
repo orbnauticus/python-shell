@@ -11,5 +11,5 @@ parser = argparse.ArgumentParser()
 args = parser.parse_args()
 
 shell = Shell(stdout=sys.stdout)
-shell.add_command('stub', StubCommand())
+shell.add_command('stub', StubCommand)
 shell.send_stream(sys.stdin)

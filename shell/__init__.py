@@ -65,7 +65,7 @@ class Shell:
             prompt2=prompt2,
         )
         self.commands = dict()
-        self.add_command('exit', ExitCommand())
+        self.add_command('exit', ExitCommand)
         self.add_command('help', HelpCommand(self.commands))
 
     def parser(self, line):
@@ -79,8 +79,24 @@ class Shell:
             else:
                 raise
 
-    def add_command(self, name, class_):
-        self.commands[name] = class_
+    def add_command(self, name, class_or_object):
+        if isinstance(class_or_object, Command):
+            instance = class_or_object
+        elif (isinstance(class_or_object, type) and
+              issubclass(class_or_object, Command)):
+            instance = class_or_object()
+        else:
+            raise TypeError("Expected instance or subclass of Command")
+
+        if not hasattr(instance, 'parser'):
+            instance.parser = None
+        if instance.parser is not None:
+            if not instance.parser.description:
+                instance.parser.description = instance.run.__doc__
+            if not instance.parser.prog:
+                instance.parser.prog = name
+
+        self.commands[name] = instance
 
     def get_prompt(self, continued):
         if continued:

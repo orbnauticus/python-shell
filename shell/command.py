@@ -12,15 +12,9 @@ class Command:
     def __init__(self, function=None):
         if function is not None:
             self.run = function
-        parser = getattr(self, 'parser', None)
-        if parser and not parser.description:
-            parser.description = self.run.__doc__
 
     def __call__(self, command, arguments):
-        parser = getattr(self, 'parser', None)
-        if parser is not None:
-            if not parser.prog:
-                parser.prog = command
+        if self.parser is not None:
             try:
                 arguments = self.parser.parse_args(arguments)
             except SystemExit:
