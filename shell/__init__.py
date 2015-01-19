@@ -8,6 +8,19 @@ from .command import Command
 from .stream import InputStream
 
 
+class Parser:
+    def __call__(self, line):
+        try:
+            return (shlex.split(line, comments=True), '')
+        except ValueError as error:
+            if error.args == ('No closing quotation',):
+                return None, line
+            elif error.args == ('No escaped character',):
+                return None, line[:-1]
+            else:
+                raise
+
+
 class HelpCommand(Command):
     def __init__(self, commands):
         self.commands = commands
@@ -43,7 +56,9 @@ class ExitCommand(Command):
 
 class Shell:
     def __init__(self, prompt='$ ', prompt2='> ', history=None,
-                 use_rawinput=True, completekey='tab', stdout=sys.stdout):
+                 use_rawinput=True, completekey='tab', stdout=sys.stdout,
+                 parser=None):
+        self.parser = parser or Parser()
         self.stdout = stdout
         self.history = history
         self.use_rawinput = use_rawinput
@@ -55,17 +70,6 @@ class Shell:
         self.commands = dict()
         self.add_command(ExitCommand)
         self.add_command(HelpCommand(self.commands))
-
-    def parser(self, line):
-        try:
-            return (shlex.split(line, comments=True), '')
-        except ValueError as error:
-            if error.args == ('No closing quotation',):
-                return None, line
-            elif error.args == ('No escaped character',):
-                return None, line[:-1]
-            else:
-                raise
 
     def add_command(self, class_or_object=None):
         if class_or_object is None:
