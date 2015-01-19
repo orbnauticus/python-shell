@@ -1,5 +1,5 @@
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, REMAINDER
 
 
 class Command(ArgumentParser):
@@ -19,3 +19,13 @@ class Command(ArgumentParser):
             #  return to the shell instead of shutting down completely.
             return
         self.run(arguments)
+
+    def add_argument(self, *args, **kwargs):
+        if ('metavar' not in kwargs and
+              kwargs.get('nargs') in ('*', '+', REMAINDER) and
+              not args[0].startswith('-')):
+            if args[0].endswith('ies'):
+                kwargs['metavar'] = args[0][:-3] + 'y'
+            elif args[0].endswith('s'):
+                kwargs['metavar'] = args[0][:-1]
+        return super().add_argument(*args, **kwargs)
