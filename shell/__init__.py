@@ -4,17 +4,15 @@ import sys
 import traceback
 
 from .environment import Environment
-from .command import Command, Parser
+from .command import Command
 from .stream import InputStream
 
 
 class HelpCommand(Command):
-    parser = Parser(add_help=False)
-
-    parser.add_argument('command', nargs='?')
-
     def __init__(self, commands):
         self.commands = commands
+        super().__init__(add_help=False, name='help')
+        self.add_argument('command', nargs='?')
 
     def run(self, args):
         if args.command is None:
@@ -26,31 +24,21 @@ class HelpCommand(Command):
                 print('No help available for unknown command {!r}'.format(
                     args.command))
                 return
-            parser = getattr(command, 'parser', None)
-            if parser is None:
-                print('No help provided for {!r}'.format(args.command))
-            else:
-                if not parser.prog:
-                    parser.prog = args.command
-                parser.print_help()
+            command.print_help()
 
 
 class ExitCommand(Command):
-    parser = Parser(add_help=False)
-    parser.add_argument(
-        'status', type=int, nargs='?', default=0,
-        help="The return code of the process. Default is 0")
+    def __init__(self, **kwargs):
+        super().__init__(add_help=False, name='exit')
+        self.add_argument(
+            'status', type=int, nargs='?', default=0,
+            help="The return code of the process. Default is 0")
 
     def run(self, args):
         """
         Terminate the shell process.
         """
         exit(args.status)
-
-
-class StubCommand(Command):
-    def run(self, args):
-        print(args)
 
 
 class Shell:
@@ -65,8 +53,8 @@ class Shell:
             prompt2=prompt2,
         )
         self.commands = dict()
-        self.add_command('exit', ExitCommand)
-        self.add_command('help', HelpCommand(self.commands))
+        self.add_command(ExitCommand)
+        self.add_command(HelpCommand(self.commands))
 
     def parser(self, line):
         try:
@@ -79,24 +67,22 @@ class Shell:
             else:
                 raise
 
-    def add_command(self, name, class_or_object):
+    def add_command(self, class_or_object=None):
+        if class_or_object is None:
+            def add_command(function):
+                self.add_command(name, function)
+                return function
+            return add_command
+
         if isinstance(class_or_object, Command):
             instance = class_or_object
         elif (isinstance(class_or_object, type) and
               issubclass(class_or_object, Command)):
             instance = class_or_object()
         else:
-            raise TypeError("Expected instance or subclass of Command")
-
-        if not hasattr(instance, 'parser'):
-            instance.parser = None
-        if instance.parser is not None:
-            if not instance.parser.description:
-                instance.parser.description = instance.run.__doc__
-            if not instance.parser.prog:
-                instance.parser.prog = name
-
-        self.commands[name] = instance
+            instance = Command(class_or_object)
+        self.commands[instance.name] = instance
+        return instance
 
     def get_prompt(self, continued):
         if continued:
