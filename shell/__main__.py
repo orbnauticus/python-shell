@@ -26,6 +26,23 @@ def stub(args):
 stub.add_argument('args', nargs='*')
 
 
+import inspect
+
+@shell.add_command
+def fail(args):
+    """
+    Raise an exception
+    """
+    raise args.exception
+
+fail.add_argument(
+    'exception', nargs='?', default=Exception,
+    choices=[name for name, member in inspect.getmembers(__builtins__)
+             if isinstance(member, type) and issubclass(member, BaseException)
+             and not issubclass(member, Warning)],
+    type=lambda name:getattr(__builtins__, name))
+
+
 shell.arguments = args.arguments
 
 shell.send_stream(args.stdin)
