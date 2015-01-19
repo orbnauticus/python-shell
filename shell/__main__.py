@@ -8,6 +8,10 @@ import sys
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('stdin', nargs='?', type=argparse.FileType('r'),
+                    default=sys.stdin)
+parser.add_argument('arguments', nargs=argparse.REMAINDER)
+
 args = parser.parse_args()
 
 shell = Shell(stdout=sys.stdout)
@@ -19,6 +23,9 @@ def stub(args):
     """
     print(args.args)
 
-stub.add_argument('args', nargs='*', metavar='arg')
+stub.add_argument('args', nargs='*')
 
-shell.send_stream(sys.stdin)
+
+shell.arguments = args.arguments
+
+shell.send_stream(args.stdin)
