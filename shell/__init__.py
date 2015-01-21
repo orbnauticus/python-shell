@@ -27,17 +27,17 @@ class HelpCommand(Command):
         super().__init__(add_help=False, name='help')
         self.add_argument('command', nargs='?')
 
-    def run(self, args):
-        if args.command is None:
+    def run(self, command=None):
+        if command is None:
             print('\n'.join(sorted(self.commands.keys())))
         else:
             try:
-                command = self.commands[args.command]
+                parser = self.commands[command]
             except KeyError:
                 print('No help available for unknown command {!r}'.format(
-                    args.command))
+                    command))
                 return
-            command.print_help()
+            parser.print_help()
 
 
 class ExitCommand(Command):
@@ -47,11 +47,11 @@ class ExitCommand(Command):
             'status', type=int, nargs='?', default=0,
             help="The return code of the process. Default is 0")
 
-    def run(self, args):
+    def run(self, status=0):
         """
         Terminate the shell process.
         """
-        exit(args.status)
+        exit(status)
 
 
 class Shell:
