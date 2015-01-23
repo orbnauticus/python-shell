@@ -6,19 +6,7 @@ import traceback
 from .environment import Environment
 from .command import Command
 from .stream import InputStream
-
-
-class Parser:
-    def __call__(self, line):
-        try:
-            return (shlex.split(line, comments=True), '')
-        except ValueError as error:
-            if error.args == ('No closing quotation',):
-                return None, line
-            elif error.args == ('No escaped character',):
-                return None, line[:-1]
-            else:
-                raise
+from .parser import Parser
 
 
 class HelpCommand(Command):
@@ -110,8 +98,10 @@ class Shell:
     def send_stream(self, stream):
         input_stream = InputStream(self, stream)
         try:
-            for command, arguments in input_stream:
-                self.one_command(command, arguments)
+            for line in input_stream:
+                self.parser.send_line(line)
+                for statement in self.parser:
+                    self.one_command(statement[0], statement[1:])
             if input_stream.isatty:
                 input_stream.stdout.write('exit\n')
                 input_stream.stdout.flush()

@@ -41,10 +41,11 @@ class InputStream:
             if self.history:
                 readline.write_history_file(self.history)
 
-    def readline(self, continued):
+    def readline(self):
+        continued = not self.parser.is_complete()
         prompt = self.get_prompt(continued) if self.isatty else ''
         if self.use_rawinput:
-            return '%s\n%s' % (continued, input(prompt))
+            return input(prompt)
         else:
             if self.isatty:
                 self.stdout.write(prompt)
@@ -52,12 +53,9 @@ class InputStream:
             line = self.stdin.readline()
             if not len(line):
                 raise EOFError
-            return '%s\n%s' % (continued, line.rstrip('\r\n'))
+            return line.rstrip('\r\n')
 
     def __iter__(self):
         with self:
-            excess = ''
             while True:
-                statement, excess = self.parser(self.readline(excess))
-                if statement:
-                    yield statement[0], statement[1:]
+                yield self.readline()
