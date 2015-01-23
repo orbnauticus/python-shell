@@ -84,10 +84,15 @@ class Shell:
         return prompt.format(**self.environment)
 
     def one_command(self, command, arguments):
-        if command in self.commands:
-            self.commands[command](command, arguments)
+        try:
+            if command in self.commands:
+                return self.commands[command](command, arguments)
+            else:
+                return self.default(command, arguments)
+        except Exception as error:
+            self.last_error = error
         else:
-            self.default(command, arguments)
+            self.last_error = None
 
     def default(self, command, arguments):
         print('No such command: {!r}'.format(command))
