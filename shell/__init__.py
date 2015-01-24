@@ -13,7 +13,6 @@ class HelpCommand(Command):
     def __init__(self, commands):
         self.commands = commands
         super().__init__(add_help=False, name='help')
-        self.add_argument('command', nargs='?')
 
     def run(self, command=None):
         if command is None:
@@ -31,11 +30,8 @@ class HelpCommand(Command):
 class ExitCommand(Command):
     def __init__(self, **kwargs):
         super().__init__(add_help=False, name='exit')
-        self.add_argument(
-            'status', type=int, nargs='?', default=0,
-            help="The return code of the process. Default is 0")
 
-    def run(self, status=0):
+    def run(self, status:int=0):
         """
         Terminate the shell process.
         """

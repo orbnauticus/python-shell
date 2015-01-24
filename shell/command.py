@@ -1,6 +1,8 @@
 
 from argparse import ArgumentParser, REMAINDER
+import inspect
 
+empty = inspect.Parameter.empty
 
 class Command(ArgumentParser):
     def __init__(self, function=None, name=None, **kwargs):
@@ -10,6 +12,17 @@ class Command(ArgumentParser):
         kwargs.setdefault('description', function.__doc__)
         self.name = kwargs['prog']
         super().__init__(**kwargs)
+        signature = inspect.signature(self.run)
+        for parameter in signature.parameters.values():
+            if isinstance(parameter.annotation, Parameter):
+                parameter.annotation.add_to(parameter, self)
+            elif parameter.kind in (parameter.POSITIONAL_ONLY,
+                                    parameter.POSITIONAL_OR_KEYWORD,
+                                    parameter.KEYWORD_ONLY):
+                self.add_argument(parameter.name, nargs='?',
+                                  default=parameter.default)
+            elif parameter.kind == parameter.VAR_POSITIONAL:
+                self.add_argument(parameter.name, nargs=REMAINDER)
 
     def __call__(self, command, arguments):
         try:
@@ -21,6 +34,8 @@ class Command(ArgumentParser):
         self.run(**vars(arguments))
 
     def add_argument(self, *args, **kwargs):
+        if kwargs.get('default') is empty:
+            del kwargs['default']
         if ('metavar' not in kwargs and
               kwargs.get('nargs') in ('*', '+', REMAINDER) and
               not args[0].startswith('-')):
@@ -29,3 +44,27 @@ class Command(ArgumentParser):
             elif args[0].endswith('s'):
                 kwargs['metavar'] = args[0][:-1]
         return super().add_argument(*args, **kwargs)
+
+
+class Parameter:
+    pass
+
+
+class List(Parameter):
+    def __init__(self, start, stop=None, multiple_of=None):
+        self.minimum = 0 if stop is None else start
+        self.maximum = start if stop is None else stop
+        self.multiple_of = multiple_of
+
+    def __call__(self, value):
+        return value
+
+    def add_to(self, parameter, command):
+        kwargs = dict(default=parameter.default)
+        if self.minimum == 0:
+            kwargs['nargs'] = '*'
+        elif self.minimum == 1:
+            kwargs['nargs'] = '+'
+        else:
+            kwargs['nargs'] = self.maximum
+        command.add_argument(parameter.name, **kwargs)
