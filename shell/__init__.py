@@ -4,7 +4,7 @@ import sys
 import traceback
 
 from .environment import Environment
-from .command import Command
+from .command import Command, List
 from .stream import InputStream
 from .parser import Parser
 
@@ -38,6 +38,18 @@ class ExitCommand(Command):
         exit(status)
 
 
+class EchoCommand(Command):
+    def __init__(self, environment):
+        super().__init__(name='echo')
+        self.environment = environment
+
+    def run(self, words:List(0)):
+        """
+        Print arguments to stdout
+        """
+        print(' '.join(word.format(**self.environment) for word in words))
+
+
 class Shell:
     def __init__(self, prompt='$ ', prompt2='> ', history=None,
                  use_rawinput=True, completekey='tab', stdout=sys.stdout,
@@ -54,6 +66,7 @@ class Shell:
         self.commands = dict()
         self.add_command(ExitCommand)
         self.add_command(HelpCommand(self.commands))
+        self.add_command(EchoCommand(self.environment))
 
     def add_command(self, class_or_object=None):
         if class_or_object is None:
