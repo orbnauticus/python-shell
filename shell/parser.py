@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from collections import deque
+
 
 class Singleton:
     def __init__(self, name):
@@ -12,6 +14,8 @@ class Singleton:
 EMIT_STATEMENTS = Singleton('EMIT_STATEMENTS')
 END_STATEMENT = Singleton('END_STATEMENT')
 END_TOKEN = Singleton('END_TOKEN')
+INCLUDE = Singleton('INCLUDE')
+END_CONTEXT = Singleton('END_CONTEXT')
 
 
 class Context:
@@ -24,29 +28,67 @@ class Context:
         assert all(bool(x) is False for x in vars(self).values())
 
 
-class Classes:
-    def __init__(self, whitespace=' \t\r\n', terminator='\n;', escape='\\'):
-        self.whitespace = whitespace
-        self.operators = {
+class Context:
+    def __init__(self, directives):
+        self.directives = dict(
+            (key, value if isinstance(value, list) else [value])
+            for key, value in directives.items())
+        self.directives.setdefault(None, [INCLUDE])
+
+
+class Comment(Context):
+    def __init__(self, final):
+        super().__init__({
+            final: END_CONTEXT,
+            None: [''],
+        })
+
+
+class StrictQuote(Context):
+    def __init__(self, final):
+        super().__init__({
+            final: END_CONTEXT,
+        })
+
+
+class Quote(StrictQuote):
+    def __init__(self, final):
+        super().__init__(final)
+        self.directives.update({
+            '\\': [Escape('\\', {
+                final: final,
+                None: ['\\', INCLUDE],
+            })],
+        })
+
+
+class Escape(Context):
+    def __init__(self, escape, directives):
+        directives.setdefault(None, INCLUDE)
+        directives.setdefault(escape, INCLUDE)
+        super().__init__(directives)
+        for key in self.directives:
+            value = self.directives[key]
+            if value[-1] != END_CONTEXT:
+                value.append(END_CONTEXT)
+
+
+class GeneralContext(Context):
+    def __init__(self):
+        super().__init__({
+            '"': Quote('"'),
+            "'": StrictQuote("'"),
+            '#': Comment('\n'),
+            ' ': END_TOKEN,
+            '\t': END_TOKEN,
+            '\r': END_TOKEN,
+            '\\': Escape('\\', {
+                '\n': '',
+                None: INCLUDE,
+            }),
             '\n': EMIT_STATEMENTS,
-            ';': END_STATEMENT,
-        }
-        self.escape = escape
-        self.quotes = {
-            '"': '"',
-            "'": "'",
-        }
-        self.newline = '\n'
-        self.sequences = {
-            '\n': '',
-            't': '\t',
-            'r': '\r',
-            'n': '\n',
-            ' ': ' ',
-        }
-        self.comments = {
-            '#': '\n',
-        }
+            ';': EMIT_STATEMENTS,
+        })
 
 
 class Parser:
@@ -55,58 +97,51 @@ class Parser:
         self.buffer = ''
         self.statement = []
         self.statements = []
-        self.context = Context()
-        self.classes = Classes()
+        self.newline = '\n'
+        self.context_stack = deque()
+        self.context_stack.append(GeneralContext())
+
+    @property
+    def context(self):
+        return self.context_stack[-1]
 
     def send_line(self, line):
-        self.buffer = self.buffer + line.rstrip('\r\n') + self.classes.newline
+        self.buffer = self.buffer + line.rstrip('\r\n') + self.newline
 
     def is_complete(self):
         return not (self.token or self.statement or self.statements)
 
     def _include(self, character):
         self.token += character
-        if self.context.escape:
-            self.context.escape = False
-
-    def _ignore(self):
-        self.context.escape = False
 
     def _handle_character(self, character):
-        if self.context.comment:
-            if character == self.context.comment:
-                self.context.comment = ''
-                if character == self.classes.newline:
-                    return self._handle_character(self.classes.newline)
-        elif self.context.escape:
-            if character in self.classes.sequences:
-                self._include(self.classes.sequences[character])
-            else:
-                self._include(self.classes.escape + character)
-        elif character == self.classes.escape:
-            self.context.escape = True
-        elif self.context.quote:
-            if character == self.context.quote:
-                self.context.quote = ''
-            else:
-                self._include(character)
-        elif character in self.classes.operators:
-            return self.classes.operators[character]
-        elif character in self.classes.quotes:
-            self.context.quote = self.classes.quotes[character]
-        elif character in self.classes.comments:
-            self.context.comment = self.classes.comments[character]
-        elif character in self.classes.whitespace:
-            return END_TOKEN
-        else:
-            self._include(character)
+        directives = self.context.directives[
+            character if character in self.context.directives else None]
+        for directive in directives:
+            if isinstance(directive, str):
+                # print('** append %r' % directive)
+                self.token += directive
+            elif isinstance(directive, Context):
+                # print('** push context %r' % directive)
+                self.context_stack.append(directive)
+            elif directive is END_CONTEXT:
+                # print('** pop context %r' % self.context)
+                self.context_stack.pop()
+            elif directive is INCLUDE:
+                # print('** include %r' % character)
+                self.token += character
+            elif isinstance(directive, Exception):
+                raise directive
+            elif directive in (END_TOKEN, END_STATEMENT, EMIT_STATEMENTS):
+                # print(directive)
+                return directive
 
     def __iter__(self):
         count = 0
         for count, character in enumerate(self.buffer, 1):
             new = self._handle_character(character)
             if new in (END_TOKEN, END_STATEMENT):
-                self.context.assert_clean()
+                assert len(self.context_stack) == 1
             if (new in (END_TOKEN, END_STATEMENT, EMIT_STATEMENTS)
                     and self.token):
                 self.statement.append(self.token)
@@ -122,35 +157,70 @@ class Parser:
 
 if __name__ == '__main__':
 
-    from io import StringIO
+    sample = r"""
+$ stub
+['stub']
 
-    sample = StringIO(r"""
-stub
-stub 1 2 3
-stub 1 2 \
-3
-stub "1
-2 3"
-stub 1\n2 3
-stub "1\n2" 3
-stub 1 ; stub 2
-stub 1; stub 2;;;
-stub "1 2 3"
-stub "1 '2' 3"
-stub "1 2 3" # This comment is ignored through the end of the line
-stub "1 2 3 # This comment is part of the string
-"
-stub 1\ 2\ 3
-stub \z
+$ stub 1 2 3
+['stub', '1', '2', '3']
 
-""")
+$ stub 1 2 \
+> 3
+['stub', '1', '2', '3']
+
+$ stub "1
+> 2 3"
+['stub', '1\n2 3']
+
+$ stub 1\n2 3
+['stub', '1n2 3']
+
+$ stub "1\n2" 3
+['stub', '1\n2' 3]
+
+$ stub 1 ; stub 2
+['stub', '1']
+['stub', '2']
+
+$ stub 1; stub 2;;;
+['stub', '1']
+['stub', '2']
+
+$ stub "1 2 3"
+['stub', '1 2 3']
+
+$ stub "1 '2' 3"
+['stub', "1 '2' 3"]
+
+$ stub "1 2 3" # This comment is ignored through the end of the line
+['stub', '1 2 3']
+
+$ stub "1 2 3 # This comment is part of the string
+> "
+['stub', '1 2 3 # This comment is part of the string\n']
+
+$ stub 1\ 2\ 3
+['stub', '1 2 3']
+
+$ stub \z
+['stub', '\z']
+
+"""
 
     parser = Parser()
 
+    from io import StringIO
+
+    for block in sample.split('\n$ '):
+        for line in StringIO('> ' + block):
+            if line.startswith('> '):
+                parser.send_line(line)
+        print(repr(block))
     for line in sample:
         parser.send_line(line)
-        print('** buffer %r' % parser.buffer)
+        #print('** buffer %r' % parser.buffer)
         for statement in parser:
-            print(repr(statement))
+            pass
+            #print(repr(statement))
     if parser.buffer:
         print('** Leftover buffer %r' % parser.buffer)

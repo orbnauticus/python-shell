@@ -50,16 +50,27 @@ class EchoCommand(Command):
         print(' '.join(word.format(**self.environment) for word in words))
 
 
+def instantiate(class_or_object, *args, **kwargs):
+    """
+    Returns an instance of class_or_object.
+    """
+    if isinstance(class_or_object, type):
+        return class_or_object(*args, **kwargs)
+    else:
+        return class_or_object
+
+
 class Shell:
     def __init__(self, prompt='$ ', prompt2='> ', history=None,
                  use_rawinput=True, completekey='tab', stdout=sys.stdout,
-                 parser=None):
+                 parser=None, environment=Environment):
         self.parser = parser or Parser()
         self.stdout = stdout
         self.history = history
         self.use_rawinput = use_rawinput
         self.completekey = completekey
-        self.environment = Environment(
+        self.environment = instantiate(environment)
+        self.environment.update(
             prompt=prompt,
             prompt2=prompt2,
         )
