@@ -19,16 +19,6 @@ END_CONTEXT = Singleton('END_CONTEXT')
 
 
 class Context:
-    def __init__(self, escape=False, quote='', comment=''):
-        self.escape = escape
-        self.quote = quote
-        self.comment = comment
-
-    def assert_clean(self):
-        assert all(bool(x) is False for x in vars(self).values())
-
-
-class Context:
     def __init__(self, directives):
         self.directives = dict(
             (key, value if isinstance(value, list) else [value])
