@@ -101,9 +101,6 @@ class Parser:
     def is_complete(self):
         return not (self.token or self.statement or self.statements)
 
-    def _include(self, character):
-        self.token += character
-
     def _handle_character(self, character):
         directives = self.context.directives[
             character if character in self.context.directives else None]
