@@ -16,7 +16,7 @@ END_STATEMENT = Singleton('END_STATEMENT')
 END_TOKEN = Singleton('END_TOKEN')
 INCLUDE = Singleton('INCLUDE')
 END_CONTEXT = Singleton('END_CONTEXT')
-REVISIT = Singleton('REVISIT')
+REFER = Singleton('REFER')
 
 
 class Context:
@@ -28,9 +28,9 @@ class Context:
 
 
 class Comment(Context):
-    def __init__(self, final, revisit=False):
+    def __init__(self, final, refer=False):
         super().__init__({
-            final: [END_CONTEXT] + ([REVISIT] if revisit else []),
+            final: REFER if refer else END_CONTEXT,
             None: [''],
         })
 
@@ -118,8 +118,9 @@ class Parser:
             elif directive is INCLUDE:
                 # print('** include %r' % character)
                 self.token += character
-            elif directive is REVISIT:
-                # print('** revisit %r' % character)
+            elif directive is REFER:
+                # print('** refer %r' % character)
+                self.context_stack.pop()
                 result = self._handle_character(character)
                 if result is not None:
                     return result
