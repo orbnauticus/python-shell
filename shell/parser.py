@@ -144,70 +144,46 @@ class Parser:
 
 if __name__ == '__main__':
 
-    sample = r"""
-$ stub
-['stub']
+    import inspect
 
-$ stub 1 2 3
-['stub', '1', '2', '3']
+    def test_statement(statement, *expected):
+        callingframe = inspect.getouterframes(inspect.currentframe())[-1]
+        _, filename, linenumber, _, _, _ = callingframe
+        parser = Parser()
+        parser.send_line(statement.strip('\n') + '\n')
+        if not parser.is_complete():
+            print('*' * 40)
+            print('Incomplete statement at line {} of {}:'.format(
+                linenumber, filename))
+            print('\t$', '\n\t> '.join(statement.split('\n')))
+            return
+        expected = list(expected)
+        got = list(parser)
+        if got != expected:
+            print('*' * 40)
+            print('Statement at line {} of {}:'.format(linenumber, filename))
+            print('\t$', '\n\t> '.join(statement.split('\n')))
+            print('Expected:')
+            print('\n'.join('\t{!r}'.format(x) for x in expected))
+            print('Got:')
+            print('\n'.join('\t{!r}'.format(x) for x in got))
+            return
 
-$ stub 1 2 \
-> 3
-['stub', '1', '2', '3']
-
-$ stub "1
-> 2 3"
-['stub', '1\n2 3']
-
-$ stub 1\n2 3
-['stub', '1n2 3']
-
-$ stub "1\n2" 3
-['stub', '1\n2' 3]
-
-$ stub 1 ; stub 2
-['stub', '1']
-['stub', '2']
-
-$ stub 1; stub 2;;;
-['stub', '1']
-['stub', '2']
-
-$ stub "1 2 3"
-['stub', '1 2 3']
-
-$ stub "1 '2' 3"
-['stub', "1 '2' 3"]
-
-$ stub "1 2 3" # This comment is ignored through the end of the line
-['stub', '1 2 3']
-
-$ stub "1 2 3 # This comment is part of the string
-> "
-['stub', '1 2 3 # This comment is part of the string\n']
-
-$ stub 1\ 2\ 3
-['stub', '1 2 3']
-
-$ stub \z
-['stub', '\z']
-
-"""
-
-    parser = Parser()
-
-    from io import StringIO
-
-    for block in sample.split('\n$ '):
-        for line in StringIO('> ' + block):
-            if line.startswith('> '):
-                parser.send_line(line)
-        print(repr(block))
-    for line in sample:
-        parser.send_line(line)
-        #print('** buffer %r' % parser.buffer)
-        for statement in parser:
-            pass
-            #print(repr(statement))
-    if parser.buffer:
-        print('** Leftover buffer %r' % parser.buffer)
+    test_statement('stub', ['stub'])
+    test_statement('stub 1 2 3', ['stub', '1', '2', '3'])
+    test_statement('stub 1 2 \\\n3', ['stub', '1', '2', '3'])
+    test_statement('stub "1\n2 3"', ['stub', '1\n2 3'])
+    test_statement('stub 1\\n2 3', ['stub', '1n2', '3'])
+    test_statement('stub "1\n2" 3', ['stub', '1\n2', '3'])
+    test_statement('stub 1 ; stub 2', ['stub', '1'], ['stub', '2'])
+    test_statement('stub 1; stub 2;;;', ['stub', '1'], ['stub', '2'])
+    test_statement('stub "1 2 3"', ['stub', '1 2 3'])
+    test_statement('stub "1 \'2\' 3"', ['stub', "1 '2' 3"])
+    test_statement(
+        'stub "1 2 3" # This comment is ignored through the end of the line',
+        ['stub', '1 2 3'])
+    test_statement('stub "1 2 3 # This comment is part of the string\n"',
+                   ['stub', '1 2 3 # This comment is part of the string\n'])
+    test_statement(r'stub 1\ 2\ 3', ['stub', '1 2 3'])
+    test_statement(r'stub \z', ['stub', 'z'])
+    test_statement(r'stub "\z"', ['stub', r'\z'])
