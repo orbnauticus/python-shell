@@ -16,6 +16,7 @@ END_STATEMENT = Singleton('END_STATEMENT')
 END_TOKEN = Singleton('END_TOKEN')
 INCLUDE = Singleton('INCLUDE')
 END_CONTEXT = Singleton('END_CONTEXT')
+REVISIT = Singleton('REVISIT')
 
 
 class Context:
@@ -27,9 +28,9 @@ class Context:
 
 
 class Comment(Context):
-    def __init__(self, final):
+    def __init__(self, final, revisit=False):
         super().__init__({
-            final: END_CONTEXT,
+            final: [END_CONTEXT] + ([REVISIT] if revisit else []),
             None: [''],
         })
 
@@ -68,7 +69,7 @@ class GeneralContext(Context):
         super().__init__({
             '"': Quote('"'),
             "'": StrictQuote("'"),
-            '#': Comment('\n'),
+            '#': Comment('\n', True),
             ' ': END_TOKEN,
             '\t': END_TOKEN,
             '\r': END_TOKEN,
@@ -117,6 +118,11 @@ class Parser:
             elif directive is INCLUDE:
                 # print('** include %r' % character)
                 self.token += character
+            elif directive is REVISIT:
+                # print('** revisit %r' % character)
+                result = self._handle_character(character)
+                if result is not None:
+                    return result
             elif isinstance(directive, Exception):
                 raise directive
             elif directive in (END_TOKEN, END_STATEMENT, EMIT_STATEMENTS):
