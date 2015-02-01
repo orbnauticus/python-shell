@@ -39,15 +39,24 @@ class Lookup:
         raise DeleteForbidden
 
 
+class NO_DEFAULT:
+    pass
+
+
 class ItemLookup(Lookup):
-    def __init__(self, obj, item, set_allowed=True, delete_allowed=False):
+    def __init__(self, obj, item, default=NO_DEFAULT,
+                 set_allowed=True, delete_allowed=True):
         self.obj = obj
         self.item = item
+        self.default = default
         self.set_allowed = set_allowed
         self.delete_allowed = delete_allowed
 
     def __get__(self):
-        return self.obj[self.item]
+        if self.default is NO_DEFAULT:
+            return self.obj[self.item]
+        else:
+            return self.obj.get(self.item, self.default)
 
     def __set__(self, new):
         if self.set_allowed:
@@ -60,10 +69,6 @@ class ItemLookup(Lookup):
             del self.obj[self.item]
         else:
             raise DeleteForbidden
-
-
-class NO_DEFAULT:
-    pass
 
 
 class AttributeLookup(Lookup):
@@ -99,7 +104,7 @@ class Environment(collections.MutableMapping):
 
     >>> source_list = [1, 2, 3]
 
-    >>> source_dict = {'a': 4, 'b': 5}
+    >>> source_dict = {'b': 5}
 
     >>> class MyClass:
     ...   def __init__(self, property):
@@ -111,9 +116,10 @@ class Environment(collections.MutableMapping):
     ...   return 'Generated Value'
 
     >>> env = Environment(
-    ...   zero = ItemLookup(source_list, 0),
-    ...   first = ItemLookup(source_list, 0, delete_allowed=True),
-    ...   b = ItemLookup(source_dict, 'b', delete_allowed=True),
+    ...   first = ItemLookup(source_list, 0),
+    ...   zero = ItemLookup(source_list, 0, delete_allowed=False),
+    ...   a = ItemLookup(source_dict, 'a', default='default'),
+    ...   b = ItemLookup(source_dict, 'b'),
     ...   property = AttributeLookup(source_object, 'property'),
     ...   gen = Lookup(source_callable),
     ... )
@@ -130,6 +136,19 @@ class Environment(collections.MutableMapping):
 
     >>> env['first']
     2
+
+    >>> env['a']
+    'default'
+
+    >>> env['a'] = 9
+
+    >>> env['a']
+    9
+
+    >>> del env['a']
+
+    >>> env['a']
+    'default'
 
     >>> env['b']
     5
