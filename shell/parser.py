@@ -194,3 +194,4 @@ if __name__ == '__main__':
     test_statement(r'stub 1\ 2\ 3', ['stub', '1 2 3'])
     test_statement(r'stub \z', ['stub', 'z'])
     test_statement(r'stub "\z"', ['stub', r'\z'])
+    test_statement('stub 1\ 2 "1\ 2" ', ['stub', '1 2', r'1\ 2'])
