@@ -117,16 +117,21 @@ class Shell:
     def default(self, command, arguments):
         print('No such command: {!r}'.format(command))
 
+    def run_statements(self):
+        for statement in self.parser:
+            self.one_command(statement[0], statement[1:])
+
     def send_command(self, command):
-        raise NotImplementedError
+        self.parser.send_line(command + '\n')
+        self.run_statements()
+        self.parser.__init__()
 
     def send_stream(self, stream):
         input_stream = InputStream(self, stream)
         try:
             for line in input_stream:
                 self.parser.send_line(line)
-                for statement in self.parser:
-                    self.one_command(statement[0], statement[1:])
+                self.run_statements()
             if input_stream.isatty:
                 input_stream.stdout.write('exit\n')
                 input_stream.stdout.flush()
